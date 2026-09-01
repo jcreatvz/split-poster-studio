@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Split Poster Studio</title>
+<style>
+:root{
+  --ink:#16182b; --ink-2:#2a2d45; --line:#e3e4ea; --line-2:#c9cbd6;
+  --bg:#f2f3f6; --card:#ffffff; --muted:#7c7f8f; --text:#22242f;
+  --accent:#2f6fdb; --accent-soft:#eaf1fd; --warn:#b4531f; --warn-soft:#fdf1e8;
+  --r:8px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg); color:var(--text);
+  font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+
+.app{display:grid;grid-template-columns:340px minmax(0,1fr);height:100vh}
+@media (max-width:880px){.app{grid-template-columns:1fr;height:auto}}
+
+/* ---------- left panel ---------- */
+.panel{background:var(--card);border-right:1px solid var(--line);overflow-y:auto}
+.brand{background:var(--ink);padding:14px 16px;position:sticky;top:0;z-index:5}
+.brand h1{margin:0;font-size:15px;font-weight:600;color:#fff;letter-spacing:-.01em}
+.brand p{margin:3px 0 0;font-size:11.5px;color:#9a9db8}
+.brand .row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tag{font-size:10.5px;color:#c9cbe0;border:1px solid #454863;border-radius:5px;padding:2px 6px}
+.gear{background:none;border:1px solid #454863;border-radius:5px;color:#c9cbe0;padding:2px 7px;font-size:11px}
+.gear:hover{background:#252843}
+
+section{padding:14px 16px;border-bottom:1px solid var(--line)}
+.h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:9px}
+.h b{font-size:12.5px;font-weight:600}
+.h span{font-size:11px;color:var(--muted)}
+.hint{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.45}
+.link{background:none;border:0;color:var(--accent);font-size:11px;padding:0}
+.link:hover{text-decoration:underline}
+
+.drop{border:1.5px dashed var(--line-2);border-radius:var(--r);min-height:82px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  color:var(--muted);font-size:12px;text-align:center;padding:12px;background:#fbfbfd}
+.drop.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.thumbwrap{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);line-height:0}
+.thumbwrap img{width:100%;display:block}
+.thumbwrap.pick{cursor:crosshair}
+.thumbwrap.pick::after{content:"Click your subject";position:absolute;left:50%;top:50%;
+  transform:translate(-50%,-50%);background:rgba(22,24,43,.82);color:#fff;font-size:11px;
+  padding:5px 10px;border-radius:20px;pointer-events:none;white-space:nowrap}
+.xbtn{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;
+  border:0;background:rgba(20,20,28,.72);color:#fff;font-size:13px;line-height:1;padding:0}
+
+.seg{display:grid;gap:6px}
+.seg.c3{grid-template-columns:repeat(3,1fr)}
+.opt{border:1px solid var(--line);background:#fff;border-radius:var(--r);padding:8px 6px;
+  font-size:11.5px;color:var(--muted);text-align:center;line-height:1.35}
+.opt:hover{border-color:var(--line-2)}
+.opt[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);
+  background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.opt .t{display:block;font-weight:600;color:inherit}
+.opt .d{display:block;font-size:10.5px;margin-top:2px;color:var(--muted)}
+.opt[aria-pressed="true"] .d{color:var(--accent)}
+.stack{display:grid;gap:6px}
+.stack .opt{text-align:left;padding:9px 11px}
+
+.sw{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{width:27px;height:27px;border-radius:6px;border:1px solid rgba(0,0,0,.12);padding:0}
+.chip[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:1.5px}
+.divide{width:1px;height:20px;background:var(--line);margin:0 2px}
+.hex{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+
+label.f{display:block;font-size:11px;color:var(--muted);margin:0 0 4px}
+textarea,input[type=text],input[type=password]{width:100%;border:1px solid var(--line);
+  border-radius:var(--r);padding:7px 9px;background:#fff;resize:vertical;
+  font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}
+textarea:focus,input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.field+.field{margin-top:9px}
+
+.slider{display:flex;align-items:center;gap:10px;margin-top:9px}
+.slider label{font-size:11px;color:var(--muted);min-width:76px}
+.slider input[type=range]{flex:1;accent-color:var(--accent)}
+.slider output{font:11px ui-monospace,Menlo,monospace;color:var(--muted);min-width:30px;text-align:right}
+
+.go{width:100%;border:0;border-radius:var(--r);background:var(--accent);color:#fff;
+  padding:11px;font-size:13.5px;font-weight:600}
+.go:hover{background:#265ec2}
+.go:disabled{background:#b9c4d6;cursor:not-allowed}
+.ghost{width:100%;border:1px solid var(--line-2);background:#fff;border-radius:var(--r);padding:8px;font-size:12px}
+.ghost:hover{background:#f6f7fa}
+
+.note{border-radius:var(--r);padding:9px 11px;font-size:11.5px;line-height:1.5;margin-top:9px}
+.note.warn{background:var(--warn-soft);color:var(--warn)}
+.note.ok{background:var(--accent-soft);color:var(--accent)}
+
+/* ---------- stage ---------- */
+.stage{display:flex;flex-direction:column;align-items:center;padding:20px;overflow:auto;gap:12px}
+.bar{display:flex;align-items:center;gap:14px;font-size:11.5px;color:var(--muted);
+  background:#fff;border:1px solid var(--line);border-radius:20px;padding:6px 14px}
+.dot{width:7px;height:7px;border-radius:50%;background:#1d9e75;display:inline-block;margin-right:6px}
+canvas#poster{max-width:100%;max-height:calc(100vh - 130px);border-radius:6px;
+  box-shadow:0 2px 18px rgba(20,24,40,.14);touch-action:none;cursor:grab;background:#fff}
+canvas#poster.drag{cursor:grabbing}
+.legend{font-size:11px;color:var(--muted);text-align:center;max-width:520px;line-height:1.5}
+
+dialog{border:0;border-radius:12px;padding:0;max-width:430px;width:92vw;
+  box-shadow:0 10px 50px rgba(15,18,30,.3)}
+dialog::backdrop{background:rgba(18,20,30,.42)}
+dialog .body{padding:18px}
+dialog h2{margin:0 0 4px;font-size:15px}
+dialog p{margin:0 0 14px;font-size:12px;color:var(--muted);line-height:1.55}
+dialog .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+dialog .acts button{border-radius:var(--r);padding:8px 14px;font-size:12.5px;border:1px solid var(--line-2);background:#fff}
+dialog .acts button.p{background:var(--accent);border-color:var(--accent);color:#fff}
+.busy{position:fixed;inset:0;background:rgba(246,247,250,.86);display:none;
+  align-items:center;justify-content:center;flex-direction:column;gap:10px;z-index:50;font-size:13px}
+.busy.on{display:flex}
+.spin{width:26px;height:26px;border:2.5px solid var(--line-2);border-top-color:var(--accent);
+  border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2s}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+
+<div class="app">
+<div class="panel">
+
+  <div class="brand">
+    <div class="row">
+      <h1>Split Poster Studio</h1>
+      <div style="display:flex;gap:6px">
+        <span class="tag">v1.0</span>
+        <button class="gear" id="btnSettings" title="Settings">Key</button>
+      </div>
+    </div>
+    <p>One photo, two halves — cutout above, silhouette below</p>
+  </div>
+
+  <section>
+    <div class="h"><b>1. Source photo</b><span>Drop, click or paste</span></div>
+    <div id="drop" class="drop">
+      <span>Drop a photo here</span>
+      <span style="font-size:10.5px">or click to browse · Ctrl+V to paste</span>
+    </div>
+    <div id="thumbwrap" class="thumbwrap" hidden>
+      <img id="thumb" alt="Source photo">
+      <button class="xbtn" id="btnClear" aria-label="Remove photo">×</button>
+    </div>
+    <input type="file" id="file" accept="image/*" hidden>
+    <div class="hint" id="srcHint">The subject is cut out automatically and reused in both halves.</div>
+  </section>
+
+  <section>
+    <div class="h"><b>2. Cutout method</b></div>
+    <div class="stack">
+      <button class="opt" data-cut="tap" aria-pressed="true">
+        <span class="t">Click the subject</span>
+        <span class="d">Works on anything — a person, a suit, a chair</span></button>
+      <button class="opt" data-cut="person" aria-pressed="false">
+        <span class="t">Find the person</span>
+        <span class="d">One step, no clicking. People only</span></button>
+      <button class="opt" data-cut="png" aria-pressed="false">
+        <span class="t">Use a transparent PNG</span>
+        <span class="d">Upload a cutout you made yourself</span></button>
+    </div>
+    <button class="ghost" id="btnInvert" style="margin-top:8px" hidden>Flip the mask</button>
+    <input type="file" id="filePng" accept="image/png,image/webp" hidden>
+    <div id="mpNote"></div>
+  </section>
+
+  <section>
+    <div class="h"><b>3. Subject filter</b></div>
+    <div class="seg c3">
+      <button class="opt" data-filter="none" aria-pressed="false">Original</button>
+      <button class="opt" data-filter="pixel" aria-pressed="true">Pixelate</button>
+      <button class="opt" data-filter="dots" aria-pressed="false">Halftone</button>
+    </div>
+    <div class="slider" id="rowPixel">
+      <label for="pxSize">Block size</label>
+      <input type="range" id="pxSize" min="4" max="34" step="1" value="11">
+      <output id="pxOut">11</output>
+    </div>
+    <div class="slider" id="rowDots" hidden>
+      <label for="dotSize">Dot pitch</label>
+      <input type="range" id="dotSize" min="4" max="26" step="1" value="9">
+      <output id="dotOut">9</output>
+    </div>
+  </section>
+
+  <section>
+    <div class="h"><b>4. Accent colour</b><span class="hex" id="hexOut">#6A7F9A</span></div>
+    <div class="sw" id="swatches"></div>
+    <div class="hint">Three drawn from the photo, three of their opposites.
+      <label style="color:var(--accent);cursor:pointer">Pick your own
+        <input type="color" id="custom" value="#6A7F9A" style="width:0;height:0;opacity:0;position:absolute">
+      </label>
+    </div>
+  </section>
+
+  <section>
+    <div class="h"><b>5. Layout</b></div>
+    <div class="stack">
+      <button class="opt" data-layout="centered" aria-pressed="true">
+        <span class="t">Split around the subject</span>
+        <span class="d">Two blocks either side, or stacked opposite an off-centre subject</span></button>
+      <button class="opt" data-layout="justified" aria-pressed="false">
+        <span class="t">Justified across the seam</span>
+        <span class="d">Two rows spanning the full width, black or white to suit</span></button>
+    </div>
+  </section>
+
+  <section>
+    <div class="h"><b>6. Caption</b><button class="link" id="btnAI">Write it for me</button></div>
+    <div class="field">
+      <label class="f" for="tL1">Left, upper — title and author</label>
+      <textarea id="tL1" rows="2">Urban Intersection
+Walking the rhythm of the street</textarea>
+    </div>
+    <div class="field">
+      <label class="f" for="tR1">Right, lower — concept and colours</label>
+      <textarea id="tR1" rows="2">Contemporary Street Style
+Beige-Umber-Charcoal</textarea>
+    </div>
+    <div class="hint" id="aiHint">Colour names update from the photo. Add an API key to have the title written too.</div>
+  </section>
+
+  <section>
+    <div class="h"><b>7. Canvas</b></div>
+    <div class="seg" style="grid-template-columns:repeat(4,1fr)">
+      <button class="opt" data-ratio="3:4" aria-pressed="true">3:4</button>
+      <button class="opt" data-ratio="1:1" aria-pressed="false">1:1</button>
+      <button class="opt" data-ratio="4:5" aria-pressed="false">4:5</button>
+      <button class="opt" data-ratio="9:16" aria-pressed="false">9:16</button>
+    </div>
+    <div class="slider">
+      <label for="splitPos">Split line</label>
+      <input type="range" id="splitPos" min="25" max="75" step="1" value="50">
+      <output id="splitOut">50%</output>
+    </div>
+    <div class="slider">
+      <label for="scaleSel">Export size</label>
+      <select id="scaleSel" style="flex:1;border:1px solid var(--line);border-radius:var(--r);padding:6px 8px;font-size:12px;background:#fff">
+        <option value="1">1× — base</option>
+        <option value="2" selected>2× — print-ready</option>
+        <option value="3">3× — large</option>
+      </select>
+    </div>
+    <button class="ghost" id="btnReset" style="margin-top:9px">Reset positions</button>
+  </section>
+
+  <section style="border-bottom:0">
+    <button class="go" id="btnExport" disabled>Export PNG</button>
+  </section>
+</div>
+
+<div class="stage">
+  <div class="bar">
+    <span><span class="dot"></span><b id="barRatio">3:4</b></span>
+    <span>Top half moves the subject · bottom half pans the photo</span>
+    <span id="barDims">900 × 1200</span>
+  </div>
+  <canvas id="poster" width="900" height="1200"></canvas>
+  <p class="legend">Drag either half to reposition. Scroll or pinch over a half to resize what's in it.</p>
+</div>
+</div>
+
+<div class="busy" id="busy"><div class="spin"></div><span id="busyText">Working…</span></div>
+
+<dialog id="dlg">
+  <div class="body">
+    <h2>Anthropic API key</h2>
+    <p>Only needed for the caption writer. Stored in this browser and sent straight to Anthropic — nothing passes through the page's host. Leave it blank and everything else still works.</p>
+    <label class="f" for="apiKey">Key</label>
+    <input type="password" id="apiKey" placeholder="sk-ant-…" autocomplete="off">
+    <label class="f" for="apiModel" style="margin-top:10px">Model</label>
+    <input type="text" id="apiModel" value="claude-sonnet-5">
+    <div class="acts">
+      <button id="dlgForget">Forget key</button>
+      <button class="p" id="dlgSave">Save</button>
+    </div>
+  </div>
+</dialog>
+
+<script type="module">
+/* ══ 1. state ═══════════════════════════════════════════════════════════ */
+const RATIOS = {'3:4':[900,1200], '1:1':[1000,1000], '4:5':[960,1200], '9:16':[810,1440]};
+const FONT = 'system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+
+const S = {
+  img:null, cutout:null, mask:null, tinted:null, bbox:null, inverted:false,
+  cutMode:'tap', filter:'pixel', layout:'centered', ratio:'3:4',
+  accent:'#6A7F9A', dominant:[], comp:[],
+  px:11, dot:9, split:.5,
+  subj:{cx:.5, cy:.5, h:.62},
+  photo:{ox:0, oy:0, zoom:1}
+};
+
+const $ = s => document.querySelector(s);
+const cv = $('#poster'), cx = cv.getContext('2d');
+const busy = (on,msg='Working…') => { $('#busyText').textContent = msg; $('#busy').classList.toggle('on', on); };
+
+/* ══ 2. colour helpers ══════════════════════════════════════════════════ */
+const hex2rgb = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16));
+const rgb2hex = (r,g,b) => '#' + [r,g,b].map(v => Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('').toUpperCase();
+const lum = (r,g,b) => { const f=v=>{v/=255; return v<=.03928 ? v/12.92 : ((v+.055)/1.055)**2.4;}; return .2126*f(r)+.7152*f(g)+.0722*f(b); };
+const ink = hexOrRgb => (Array.isArray(hexOrRgb) ? lum(...hexOrRgb) : lum(...hex2rgb(hexOrRgb))) > .48 ? '#141414' : '#F7F7F5';
+
+function rgb2hsl(r,g,b){ r/=255;g/=255;b/=255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn, l=(mx+mn)/2;
+  let h=0, s=0;
+  if(d){ s = l>.5 ? d/(2-mx-mn) : d/(mx+mn);
+    h = mx===r ? ((g-b)/d + (g<b?6:0)) : mx===g ? (b-r)/d+2 : (r-g)/d+4; h/=6; }
+  return [h,s,l];
+}
+function hsl2rgb(h,s,l){
+  if(!s) { const v=l*255; return [v,v,v]; }
+  const q = l<.5 ? l*(1+s) : l+s-l*s, p = 2*l-q;
+  const f = t => { t=(t+1)%1;
+    if(t<1/6) return p+(q-p)*6*t; if(t<1/2) return q;
+    if(t<2/3) return p+(q-p)*(2/3-t)*6; return p; };
+  return [f(h+1/3)*255, f(h)*255, f(h-1/3)*255];
+}
+function rgb2lab(r,g,b){
+  const f=v=>{v/=255; return v>.04045 ? ((v+.055)/1.055)**2.4 : v/12.92;};
+  r=f(r);g=f(g);b=f(b);
+  let x=(r*.4124+g*.3576+b*.1805)/.95047, y=r*.2126+g*.7152+b*.0722, z=(r*.0193+g*.1192+b*.9505)/1.08883;
+  const k=v=> v>.008856 ? Math.cbrt(v) : 7.787*v+16/116;
+  x=k(x);y=k(y);z=k(z);
+  return [116*y-16, 500*(x-y), 200*(y-z)];
+}
+
+const NAMES = {Ivory:'#FFFFF0',Cream:'#FFFDD0',Bone:'#E3DAC9',Linen:'#FAF0E6',Oat:'#E7DFCF',Chalk:'#F0EFE7',
+  Sand:'#E2CA96',Wheat:'#F5DEB3',Straw:'#E4D96F',Beige:'#F5F5DC',Ecru:'#C2B280',Khaki:'#C3B091',
+  Taupe:'#8B8589',Mushroom:'#BDB1A8',Clay:'#B66A50',Terracotta:'#E2725B',Sienna:'#A0522D',Umber:'#635147',
+  Ochre:'#CC7722',Rust:'#B7410E',Copper:'#B87333',Bronze:'#CD7F32',Amber:'#FFBF00',Honey:'#EBA937',
+  Mustard:'#FFDB58',Gold:'#D4AF37',Apricot:'#FBCEB1',Peach:'#FFE5B4',Coral:'#FF7F50',Salmon:'#FA8072',
+  Blush:'#DE5D83',Rose:'#FF007F',Crimson:'#DC143C',Scarlet:'#FF2400',Vermilion:'#E34234',Burgundy:'#800020',
+  Wine:'#722F37',Plum:'#8E4585',Mauve:'#E0B0FF',Lilac:'#C8A2C8',Violet:'#7F00FF',Indigo:'#4B0082',
+  Periwinkle:'#CCCCFF',Cobalt:'#0047AB',Navy:'#000080',Azure:'#007FFF',Denim:'#1560BD',Sky:'#87CEEB',
+  Aqua:'#00E5EE',Turquoise:'#40E0D0',Teal:'#008080',Emerald:'#50C878',Jade:'#00A86B',Mint:'#98FF98',
+  Sage:'#9CAF88',Moss:'#8A9A5B',Fern:'#4F7942',Olive:'#808000',Basil:'#579229',Pine:'#01796F',
+  Forest:'#228B22',Chartreuse:'#7FFF00',Lime:'#BFFF00',Charcoal:'#36454F',Graphite:'#41424C',Slate:'#708090',
+  Steel:'#4682B4',Pewter:'#8E9294',Ash:'#B2BEB5',Smoke:'#738276',Fog:'#D7D7D7',Pearl:'#EAE0C8',
+  Onyx:'#353839',Ink:'#26282B'};
+const NAME_LAB = Object.entries(NAMES).map(([n,h]) => [n, rgb2lab(...hex2rgb(h))]);
+function nameOf(rgb){
+  const L = rgb2lab(...rgb);
+  let best = 'Slate', bd = 1e9;
+  for (const [n,l] of NAME_LAB){
+    const d = (L[0]-l[0])**2 + (L[1]-l[1])**2 + (L[2]-l[2])**2;
+    if (d < bd){ bd = d; best = n; }
+  }
+  return best;
+}
+
+/* ══ 3. palette extraction ══════════════════════════════════════════════ */
+function extractPalette(img){
+  const n = 110, c = document.createElement('canvas');
+  const s = Math.min(n/img.width, n/img.height);
+  c.width = Math.max(1, Math.round(img.width*s)); c.height = Math.max(1, Math.round(img.height*s));
+  const g = c.getContext('2d', {willReadFrequently:true});
+  g.drawImage(img, 0, 0, c.width, c.height);
+  const d = g.getImageData(0,0,c.width,c.height).data;
+
+  const bins = new Map();
+  for (let i=0; i<d.length; i+=4){
+    const r=d[i], gg=d[i+1], b=d[i+2];
+    const [,sat,li] = rgb2hsl(r,gg,b);
+    if (li < .06 || li > .96) continue;
+    if (sat < .07 && (li < .18 || li > .88)) continue;
+    const k = (r>>4)*256 + (gg>>4)*16 + (b>>4);
+    const e = bins.get(k) || (bins.set(k, {n:0,r:0,g:0,b:0}), bins.get(k));
+    e.n++; e.r+=r; e.g+=gg; e.b+=b;
+  }
+  const sorted = [...bins.values()].sort((a,b) => b.n - a.n)
+    .map(e => [e.r/e.n, e.g/e.n, e.b/e.n]);
+
+  const picked = [];
+  for (const c1 of sorted){
+    if (picked.length === 3) break;
+    const L1 = rgb2lab(...c1);
+    if (picked.every(p => {
+      const L2 = rgb2lab(...p);
+      return (L1[0]-L2[0])**2 + (L1[1]-L2[1])**2 + (L1[2]-L2[2])**2 > 420;
+    })) picked.push(c1);
+  }
+  while (picked.length < 3) picked.push(sorted[picked.length] || [128,128,128]);
+
+  S.dominant = picked.map(p => rgb2hex(...p));
+  S.comp = picked.map(p => {
+    let [h,s,l] = rgb2hsl(...p);
+    h = (h + .5) % 1;
+    s = Math.min(.92, Math.max(.42, s * 1.35));
+    l = Math.min(.72, Math.max(.44, l));
+    return rgb2hex(...hsl2rgb(h,s,l));
+  });
+  S.accent = S.dominant[0];
+}
+
+function colourLine(){
+  const src = [S.accent, ...S.dominant].slice(0,4);
+  const out = [];
+  for (const h of src){
+    const n = nameOf(hex2rgb(h));
+    if (!out.includes(n)) out.push(n);
+    if (out.length === 3) break;
+  }
+  return out.join('-');
+}
+
+function paintSwatches(){
+  const box = $('#swatches'); box.innerHTML = '';
+  const add = h => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.style.background = h; b.title = `${nameOf(hex2rgb(h))} ${h}`;
+    b.setAttribute('aria-pressed', String(h.toUpperCase() === S.accent.toUpperCase()));
+    b.setAttribute('aria-label', `Accent ${nameOf(hex2rgb(h))}`);
+    b.onclick = () => { S.accent = h; S.tinted = null; syncColourText(); paintSwatches(); draw(); };
+    box.appendChild(b);
+  };
+  S.dominant.forEach(add);
+  const div = document.createElement('span'); div.className = 'divide'; box.appendChild(div);
+  S.comp.forEach(add);
+  $('#hexOut').textContent = S.accent.toUpperCase();
+  $('#custom').value = S.accent;
+}
+
+function syncColourText(){
+  const ta = $('#tR1'), lines = ta.value.split('\n');
+  lines[1] = colourLine();
+  ta.value = lines.slice(0,2).join('\n');
+}
+
+/* ══ 4. segmentation (MediaPipe) ════════════════════════════════════════ */
+const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest';
+
+/* Tried in order: alongside this page, then the repo via jsDelivr, then Google's host.
+   Drop the two .tflite files into /models/ and the first entry wins — no third party
+   at runtime and it works inside sandboxes that block storage.googleapis.com. */
+const GH = 'https://cdn.jsdelivr.net/gh/jcreatvz/split-poster-studio@main/models';
+const MODELS = {
+  tap: [
+    './models/magic_touch.tflite',
+    `${GH}/magic_touch.tflite`,
+    'https://storage.googleapis.com/mediapipe-tasks/interactive_segmenter/ptm_512_hdt_ptm_woid.tflite'
+  ],
+  person: [
+    './models/selfie_segmenter.tflite',
+    `${GH}/selfie_segmenter.tflite`,
+    'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/1/selfie_segmenter.tflite'
+  ]
+};
+
+let vision = null, tapSeg = null, personSeg = null, mpBroken = false;
+
+async function firstThatLoads(urls, make){
+  let last;
+  for (const u of urls){
+    try { const t = await make(u); console.info('Model loaded from', u); return t; }
+    catch (e){ last = e; }
+  }
+  throw last || new Error('No model source reachable');
+}
+
+async function mpVision(){
+  if (vision) return vision;
+  const mod = await import(`${MP_BASE}/+esm`);
+  vision = { mod, fs: await mod.FilesetResolver.forVisionTasks(`${MP_BASE}/wasm`) };
+  return vision;
+}
+async function getTap(){
+  if (tapSeg) return tapSeg;
+  const v = await mpVision();
+  tapSeg = await firstThatLoads(MODELS.tap, u =>
+    v.mod.InteractiveSegmenter.createFromOptions(v.fs, {
+      baseOptions:{ modelAssetPath: u }, outputCategoryMask:true, outputConfidenceMasks:true }));
+  return tapSeg;
+}
+async function getPerson(){
+  if (personSeg) return personSeg;
+  const v = await mpVision();
+  personSeg = await firstThatLoads(MODELS.person, u =>
+    v.mod.ImageSegmenter.createFromOptions(v.fs, {
+      baseOptions:{ modelAssetPath: u }, runningMode:'IMAGE',
+      outputCategoryMask:false, outputConfidenceMasks:true }));
+  return personSeg;
+}
+
+function mpFail(e){
+  mpBroken = true;
+  console.warn('MediaPipe unavailable:', e);
+  $('#mpNote').innerHTML =
+    '<div class="note warn">No cutout model could be reached. Put the two <code>.tflite</code> files ' +
+    'in <code>/models/</code> in the repo (see the README) and this resolves itself. ' +
+    'For now, switch to <b>Use a transparent PNG</b>.</div>';
+}
+
+/* pull a Float32/Uint8 mask out of whatever the task returned */
+function readMask(res){
+  if (res.confidenceMasks?.length){
+    const m = res.confidenceMasks[res.confidenceMasks.length - 1];
+    return { w:m.width, h:m.height, data:m.getAsFloat32Array(), float:true, all:res };
+  }
+  if (res.categoryMask){
+    const m = res.categoryMask;
+    return { w:m.width, h:m.height, data:m.getAsUint8Array(), float:false, all:res };
+  }
+  throw new Error('No mask in result');
+}
+
+function maskToCanvas(m, invert){
+  const c = document.createElement('canvas'); c.width = m.w; c.height = m.h;
+  const g = c.getContext('2d'), id = g.createImageData(m.w, m.h), o = id.data;
+  const hi = m.float ? 1 : 255;
+  for (let i=0, p=0; i<m.data.length; i++, p+=4){
+    let a = m.data[i] / hi;
+    a = Math.min(1, Math.max(0, (a - .34) / .32));       // soften the edge band
+    a = a*a*(3 - 2*a);                                    // smoothstep
+    if (invert) a = 1 - a;
+    o[p] = o[p+1] = o[p+2] = 255; o[p+3] = Math.round(a * 255);
+  }
+  g.putImageData(id, 0, 0);
+  return c;
+}
+
+/* decide whether the mask needs flipping, using the click point if we have one */
+function needsFlip(m, kp){
+  if (kp){
+    const x = Math.min(m.w-1, Math.round(kp.x * m.w)), y = Math.min(m.h-1, Math.round(kp.y * m.h));
+    const v = m.data[y*m.w + x] / (m.float ? 1 : 255);
+    return v < .5;                                        // clicked pixel must be foreground
+  }
+  let sum = 0;
+  for (let i=0; i<m.data.length; i+=7) sum += m.data[i] / (m.float ? 1 : 255);
+  return (sum / Math.ceil(m.data.length/7)) > .55;        // subject shouldn't be most of the frame
+}
+
+async function segment(kp){
+  if (!S.img || mpBroken) return;
+  try {
+    busy(true, 'Cutting out the subject…');
+    let res;
+    if (S.cutMode === 'tap'){
+      const seg = await getTap();
+      const roi = { keypoint: { x: kp.x, y: kp.y } };
+      res = await new Promise(r => { const v = seg.segment(S.img, roi, r); if (v) r(v); });
+    } else {
+      const seg = await getPerson();
+      res = await new Promise(r => { const v = seg.segment(S.img, r); if (v) r(v); });
+    }
+    const m = readMask(res);
+    S.inverted = needsFlip(m, kp);
+    S.rawMask = m;
+    applyMask();
+    $('#btnInvert').hidden = false;
+  } catch (e){
+    mpFail(e);
+  } finally { busy(false); }
+}
+
+function applyMask(){
+  const m = S.rawMask; if (!m || !S.img) return;
+  const W = S.img.naturalWidth, H = S.img.naturalHeight;
+  const small = maskToCanvas(m, S.inverted);
+
+  const mask = document.createElement('canvas'); mask.width = W; mask.height = H;
+  const mg = mask.getContext('2d');
+  mg.imageSmoothingQuality = 'high';
+  mg.drawImage(small, 0, 0, W, H);
+  S.mask = mask;
+
+  const cut = document.createElement('canvas'); cut.width = W; cut.height = H;
+  const cg = cut.getContext('2d');
+  cg.drawImage(S.img, 0, 0);
+  cg.globalCompositeOperation = 'destination-in';
+  cg.drawImage(mask, 0, 0);
+  S.cutout = cut;
+
+  S.bbox = bboxOf(mask);
+  S.tinted = null; filterCache.key = '';
+  resetPositions();
+  $('#btnExport').disabled = false;
+  draw();
+}
+
+function bboxOf(mask){
+  const g = mask.getContext('2d', {willReadFrequently:true});
+  const d = g.getImageData(0,0,mask.width,mask.height).data;
+  let x0=mask.width, y0=mask.height, x1=0, y1=0, hit=false;
+  for (let y=0; y<mask.height; y++)
+    for (let x=0; x<mask.width; x++){
+      if (d[(y*mask.width+x)*4+3] > 24){
+        hit = true;
+        if (x<x0) x0=x; if (x>x1) x1=x; if (y<y0) y0=y; if (y>y1) y1=y;
+      }
+    }
+  return hit ? {x:x0, y:y0, w:x1-x0+1, h:y1-y0+1} : {x:0, y:0, w:mask.width, h:mask.height};
+}
+
+/* ══ 5. filters ═════════════════════════════════════════════════════════ */
+const filterCache = { key:'', canvas:null };
+
+function filteredCutout(dw, dh, unit){
+  const key = `${S.filter}|${Math.round(dw)}|${Math.round(dh)}|${S.px}|${S.dot}`;
+  if (filterCache.key === key) return filterCache.canvas;
+  const bb = S.bbox;
+  const out = document.createElement('canvas');
+  out.width = Math.max(1, Math.round(dw)); out.height = Math.max(1, Math.round(dh));
+  const g = out.getContext('2d', {willReadFrequently:true});
+
+  if (S.filter === 'none'){
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(S.cutout, bb.x, bb.y, bb.w, bb.h, 0, 0, out.width, out.height);
+  }
+  else if (S.filter === 'pixel'){
+    const p = Math.max(2, S.px * unit);
+    const sw = Math.max(1, Math.round(out.width / p)), sh = Math.max(1, Math.round(out.height / p));
+    const t = document.createElement('canvas'); t.width = sw; t.height = sh;
+    const tg = t.getContext('2d'); tg.imageSmoothingQuality = 'high';
+    tg.drawImage(S.cutout, bb.x, bb.y, bb.w, bb.h, 0, 0, sw, sh);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(t, 0, 0, out.width, out.height);
+  }
+  else {
+    const pitch = Math.max(3, S.dot * unit);
+    const sw = Math.max(1, Math.round(out.width / pitch)), sh = Math.max(1, Math.round(out.height / pitch));
+    const t = document.createElement('canvas'); t.width = sw; t.height = sh;
+    const tg = t.getContext('2d', {willReadFrequently:true}); tg.imageSmoothingQuality = 'high';
+    tg.drawImage(S.cutout, bb.x, bb.y, bb.w, bb.h, 0, 0, sw, sh);
+    const d = tg.getImageData(0,0,sw,sh).data;
+    for (let y=0; y<sh; y++) for (let x=0; x<sw; x++){
+      const i = (y*sw+x)*4, a = d[i+3]/255;
+      if (a < .06) continue;
+      const l = lum(d[i], d[i+1], d[i+2]);
+      const r = (pitch/2) * 1.12 * Math.sqrt(a) * (.62 + .38*(1 - l));
+      g.fillStyle = `rgb(${d[i]},${d[i+1]},${d[i+2]})`;
+      g.beginPath();
+      g.arc((x+.5)*pitch, (y+.5)*pitch, Math.max(.4, r), 0, 6.2832);
+      g.fill();
+    }
+  }
+  filterCache.key = key; filterCache.canvas = out;
+  return out;
+}
+
+function tintedMask(){
+  if (S.tinted) return S.tinted;
+  const c = document.createElement('canvas');
+  c.width = S.mask.width; c.height = S.mask.height;
+  const g = c.getContext('2d');
+  g.drawImage(S.mask, 0, 0);
+  g.globalCompositeOperation = 'source-in';
+  g.fillStyle = S.accent; g.fillRect(0, 0, c.width, c.height);
+  S.tinted = c;
+  return c;
+}
+
+/* ══ 6. text layout ═════════════════════════════════════════════════════ */
+const lines = id => { const v = $(id).value.split('\n'); return [v[0]||'', v[1]||'']; };
+
+function drawBlock(g, block, cxp, cyp, size, colour){
+  g.font = `500 ${size}px ${FONT}`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = colour;
+  const lh = size * 1.45, top = cyp - (block.length-1)*lh/2;
+  block.forEach((t,i) => t && g.fillText(t, cxp, top + i*lh));
+}
+
+function layoutCentred(g, W, splitY, subjRect){
+  const size = W * .0175, pad = W * .055, minW = W * .17;
+  const [l1,l2] = lines('#tL1'), [r1,r2] = lines('#tR1');
+  const colour = ink(S.accent);
+  const cy = splitY / 2;
+
+  let left  = { a: pad, b: subjRect ? subjRect.x - pad*.5 : W*.42 };
+  let right = { a: subjRect ? subjRect.x + subjRect.w + pad*.5 : W*.58, b: W - pad };
+  const lw = left.b - left.a, rw = right.b - right.a;
+
+  if (lw >= minW && rw >= minW){
+    drawBlock(g, [l1,l2], (left.a+left.b)/2,  cy, size, colour);
+    drawBlock(g, [r1,r2], (right.a+right.b)/2, cy, size, colour);
+    return;
+  }
+  // subject is off to one side — stack both blocks in the roomier gutter
+  const zone = lw > rw ? left : right;
+  const a = Math.max(pad, zone.a), b = Math.min(W - pad, zone.b), mid = (a+b)/2;
+  drawBlock(g, [l1,l2], (a+mid)/2, cy, size, colour);
+  drawBlock(g, [r1,r2], (mid+b)/2, cy, size, colour);
+}
+
+function stripLuma(g, W, y, h){
+  const yy = Math.max(0, Math.min(g.canvas.height-1, Math.round(y)));
+  const hh = Math.max(1, Math.min(g.canvas.height - yy, Math.round(h)));
+  const d = g.getImageData(0, yy, W, hh).data;
+  let s = 0, n = 0;
+  for (let i=0; i<d.length; i+=40){ s += lum(d[i], d[i+1], d[i+2]); n++; }
+  return s / n;
+}
+
+function justifyRow(g, words, W, pad, baseline, size, colour){
+  g.font = `600 ${size}px ${FONT}`;
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.fillStyle = colour;
+  const usable = W - pad*2;
+  const widths = words.map(w => g.measureText(w).width);
+  const total = widths.reduce((a,b) => a+b, 0);
+  if (words.length < 2 || total >= usable){
+    g.textAlign = 'center'; g.fillText(words.join(' '), W/2, baseline); return;
+  }
+  const gap = (usable - total) / (words.length - 1);
+  let x = pad;
+  words.forEach((w,i) => { g.fillText(w, x, baseline); x += widths[i] + gap; });
+}
+
+/* separator lands at the word boundary nearest the middle of the row */
+function withDot(g, a, b, size){
+  const words = [...a.split(/\s+/), ...b.split(/\s+/)].filter(Boolean);
+  if (words.length < 2) return words;
+  g.font = `600 ${size}px ${FONT}`;
+  const w = words.map(x => g.measureText(x).width);
+  const total = w.reduce((s,v) => s+v, 0);
+  let run = 0, best = 1, bd = Infinity;
+  for (let i=0; i<words.length; i++){
+    run += w[i];
+    const d = Math.abs(run - total/2);
+    if (d < bd){ bd = d; best = i+1; }
+  }
+  return [...words.slice(0,best), '·', ...words.slice(best)];
+}
+
+function layoutJustified(g, W, H, splitY){
+  const size = W * .0225, pad = W * .045;
+  const [l1,l2] = lines('#tL1'), [r1,r2] = lines('#tR1');
+  const up = withDot(g, l1, r1, size), lo = withDot(g, l2, r2, size);
+  const b1 = splitY - size * .42, b2 = splitY + size * 1.14;
+  const c1 = stripLuma(g, W, b1 - size*.8, size*1.05) > .48 ? '#141414' : '#FFFFFF';
+  const c2 = stripLuma(g, W, b2 - size*.8, size*1.05) > .48 ? '#141414' : '#FFFFFF';
+  justifyRow(g, up, W, pad, b1, size, c1);
+  justifyRow(g, lo, W, pad, b2, size, c2);
+}
+
+/* ══ 7. renderer ════════════════════════════════════════════════════════ */
+function render(g, W, H){
+  const unit = W / 900;
+  const splitY = Math.round(H * S.split);
+  g.clearRect(0, 0, W, H);
+
+  g.fillStyle = S.accent; g.fillRect(0, 0, W, splitY);
+  g.fillStyle = '#e9eaee'; g.fillRect(0, splitY, W, H - splitY);
+
+  let subjRect = null;
+
+  if (S.img && S.cutout){
+    // bottom band: photo, then the silhouette riding the same transform
+    const bandH = H - splitY;
+    const iw = S.img.naturalWidth, ih = S.img.naturalHeight;
+    const base = Math.max(W/iw, bandH/ih) * S.photo.zoom;
+    const dw = iw*base, dh = ih*base;
+    const dx = (W - dw)/2 + S.photo.ox*W;
+    const dy = splitY + (bandH - dh)/2 + S.photo.oy*W;
+
+    g.save();
+    g.beginPath(); g.rect(0, splitY, W, bandH); g.clip();
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(S.img, dx, dy, dw, dh);
+    g.drawImage(tintedMask(), dx, dy, dw, dh);
+    g.restore();
+
+    // top band: the cutout, filtered
+    const bb = S.bbox;
+    const sh = splitY * S.subj.h, sw = sh * (bb.w / bb.h);
+    const sx = W*S.subj.cx - sw/2, sy = splitY*S.subj.cy - sh/2;
+    subjRect = {x:sx, y:sy, w:sw, h:sh};
+
+    g.save();
+    g.beginPath(); g.rect(0, 0, W, splitY); g.clip();
+    const f = filteredCutout(sw, sh, unit);
+    g.imageSmoothingEnabled = S.filter !== 'pixel';
+    g.drawImage(f, sx, sy, sw, sh);
+    g.restore();
+  }
+
+  if (S.layout === 'centered') layoutCentred(g, W, splitY, subjRect);
+  else layoutJustified(g, W, H, splitY);
+}
+
+function draw(){
+  const [W,H] = RATIOS[S.ratio];
+  if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; filterCache.key=''; }
+  render(cx, W, H);
+}
+
+/* ══ 8. loading images ══════════════════════════════════════════════════ */
+function loadImage(src){
+  return new Promise((res, rej) => {
+    const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src;
+  });
+}
+
+async function useFile(f){
+  if (!f || !f.type.startsWith('image/')) return;
+  const url = URL.createObjectURL(f);
+  const img = await loadImage(url);
+  S.img = img; S.rawMask = null; S.cutout = null; S.mask = null; S.tinted = null; S.inverted = false;
+  $('#thumb').src = url; $('#thumbwrap').hidden = false; $('#drop').hidden = true;
+  $('#btnInvert').hidden = true;
+  extractPalette(img); paintSwatches(); syncColourText();
+  resetPositions(); draw();
+  updateSrcHint();
+
+  if (S.cutMode === 'person') segment(null);
+  else if (S.cutMode === 'png') buildFromTransparent(img);
+}
+
+/* a pre-cut PNG: alpha channel is the mask, no model needed */
+function buildFromTransparent(img){
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d', {willReadFrequently:true});
+  g.drawImage(img, 0, 0);
+  const src = g.getImageData(0,0,W,H), out = g.createImageData(W,H);
+  let opaque = 0;
+  for (let i=0; i<src.data.length; i+=4){
+    const a = src.data[i+3];
+    if (a > 250) opaque++;
+    out.data[i] = out.data[i+1] = out.data[i+2] = 255; out.data[i+3] = a;
+  }
+  if (opaque > (W*H) * 0.985){
+    $('#mpNote').innerHTML = '<div class="note warn">That image has no transparency, so there is nothing to cut out. Export a PNG with a transparent background, or switch to one of the model-based methods.</div>';
+    return;
+  }
+  $('#mpNote').innerHTML = '';
+  const mask = document.createElement('canvas'); mask.width = W; mask.height = H;
+  mask.getContext('2d').putImageData(out, 0, 0);
+  S.mask = mask;
+  const cut = document.createElement('canvas'); cut.width = W; cut.height = H;
+  cut.getContext('2d').drawImage(img, 0, 0);
+  S.cutout = cut;
+  S.bbox = bboxOf(mask); S.tinted = null; filterCache.key = '';
+  resetPositions(); $('#btnExport').disabled = false; draw();
+}
+
+function resetPositions(){
+  S.subj = {cx:.5, cy:.5, h:.62};
+  S.photo = {ox:0, oy:0, zoom:1};
+  filterCache.key = '';
+}
+
+function updateSrcHint(){
+  const h = $('#srcHint'), tw = $('#thumbwrap');
+  tw.classList.toggle('pick', S.cutMode === 'tap' && !!S.img && !mpBroken);
+  h.textContent =
+    !S.img ? 'The subject is cut out automatically and reused in both halves.' :
+    S.cutMode === 'tap'   ? 'Click your subject in the thumbnail above.' :
+    S.cutMode === 'person'? 'Looking for a person in the photo.' :
+                            'Upload the transparent version below.';
+}
+
+/* ══ 9. interaction ═════════════════════════════════════════════════════ */
+let drag = null;
+const toCanvas = e => {
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / r.width * cv.width, y: (e.clientY - r.top) / r.height * cv.height };
+};
+
+cv.addEventListener('pointerdown', e => {
+  if (!S.cutout) return;
+  const p = toCanvas(e), splitY = cv.height * S.split;
+  drag = { top: p.y < splitY, x: p.x, y: p.y,
+           s0: {...S.subj}, p0: {...S.photo} };
+  cv.setPointerCapture(e.pointerId); cv.classList.add('drag');
+});
+cv.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toCanvas(e), dx = (p.x - drag.x) / cv.width, dy = (p.y - drag.y) / cv.width;
+  if (drag.top){
+    S.subj.cx = drag.s0.cx + dx;
+    S.subj.cy = drag.s0.cy + dy * (cv.width / (cv.height * S.split));
+  } else {
+    S.photo.ox = drag.p0.ox + dx;
+    S.photo.oy = drag.p0.oy + dy;
+  }
+  draw();
+});
+const endDrag = e => { if (!drag) return; drag = null; cv.classList.remove('drag'); };
+cv.addEventListener('pointerup', endDrag);
+cv.addEventListener('pointercancel', endDrag);
+
+cv.addEventListener('wheel', e => {
+  if (!S.cutout) return;
+  e.preventDefault();
+  const p = toCanvas(e), k = Math.exp(-e.deltaY * .0012);
+  if (p.y < cv.height * S.split) S.subj.h = Math.min(1.6, Math.max(.12, S.subj.h * k));
+  else S.photo.zoom = Math.min(6, Math.max(.4, S.photo.zoom * k));
+  draw();
+}, {passive:false});
+
+/* file input, drop, paste */
+$('#drop').onclick = () => $('#file').click();
+$('#file').onchange = e => useFile(e.target.files[0]);
+$('#filePng').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = await loadImage(URL.createObjectURL(f));
+  if (!S.img) { await useFile(f); return; }
+  buildFromTransparent(img);
+};
+['dragenter','dragover'].forEach(t => $('#drop').addEventListener(t, e => {
+  e.preventDefault(); $('#drop').classList.add('on'); }));
+['dragleave','drop'].forEach(t => $('#drop').addEventListener(t, e => {
+  e.preventDefault(); $('#drop').classList.remove('on'); }));
+$('#drop').addEventListener('drop', e => useFile(e.dataTransfer.files[0]));
+window.addEventListener('paste', e => {
+  const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+  if (it) useFile(it.getAsFile());
+});
+$('#btnClear').onclick = () => {
+  S.img = S.cutout = S.mask = S.tinted = S.rawMask = null;
+  $('#thumbwrap').hidden = true; $('#drop').hidden = false;
+  $('#btnInvert').hidden = true; $('#btnExport').disabled = true;
+  $('#mpNote').innerHTML = ''; updateSrcHint(); draw();
+};
+$('#thumb').onclick = e => {
+  if (S.cutMode !== 'tap' || !S.img) return;
+  const r = e.target.getBoundingClientRect();
+  segment({ x: (e.clientX - r.left)/r.width, y: (e.clientY - r.top)/r.height });
+};
+$('#btnInvert').onclick = () => { S.inverted = !S.inverted; applyMask(); };
+
+/* option groups */
+const group = (sel, key, after) => document.querySelectorAll(sel).forEach(b => b.onclick = () => {
+  document.querySelectorAll(sel).forEach(o => o.setAttribute('aria-pressed','false'));
+  b.setAttribute('aria-pressed','true');
+  S[key] = b.dataset[key === 'cutMode' ? 'cut' : key];
+  after && after();
+  draw();
+});
+group('[data-filter]', 'filter', () => {
+  filterCache.key = '';
+  $('#rowPixel').hidden = S.filter !== 'pixel';
+  $('#rowDots').hidden  = S.filter !== 'dots';
+});
+group('[data-layout]', 'layout');
+group('[data-ratio]', 'ratio', () => {
+  const [W,H] = RATIOS[S.ratio];
+  $('#barRatio').textContent = S.ratio; $('#barDims').textContent = `${W} × ${H}`;
+});
+group('[data-cut]', 'cutMode', () => {
+  updateSrcHint();
+  $('#mpNote').innerHTML = '';
+  if (S.cutMode === 'png'){ $('#filePng').click(); }
+  else if (S.cutMode === 'person' && S.img){ segment(null); }
+});
+
+const slide = (id, out, key, fmt) => {
+  const el = $(id);
+  el.oninput = () => { S[key] = +el.value; $(out).textContent = fmt ? fmt(+el.value) : el.value;
+    filterCache.key = ''; draw(); };
+};
+slide('#pxSize', '#pxOut', 'px');
+slide('#dotSize', '#dotOut', 'dot');
+$('#splitPos').oninput = e => { S.split = +e.target.value/100; $('#splitOut').textContent = e.target.value+'%';
+  filterCache.key=''; draw(); };
+$('#custom').oninput = e => { S.accent = e.target.value.toUpperCase(); S.tinted = null;
+  $('#hexOut').textContent = S.accent; syncColourText(); paintSwatches(); draw(); };
+['#tL1','#tR1'].forEach(id => $(id).oninput = draw);
+$('#btnReset').onclick = () => { resetPositions(); draw(); };
+
+/* ══ 10. export ═════════════════════════════════════════════════════════ */
+$('#btnExport').onclick = () => {
+  const k = +$('#scaleSel').value, [W,H] = RATIOS[S.ratio];
+  const c = document.createElement('canvas'); c.width = W*k; c.height = H*k;
+  const g = c.getContext('2d');
+  const cache = filterCache.key; filterCache.key = '';
+  render(g, W*k, H*k);
+  filterCache.key = cache;
+  c.toBlob(b => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = `split-poster-${S.ratio.replace(':','x')}-${k}x.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }, 'image/png');
+};
+
+/* ══ 11. caption writer ═════════════════════════════════════════════════ */
+const KEY = 'sps.apiKey', MDL = 'sps.model';
+$('#btnSettings').onclick = () => {
+  $('#apiKey').value = localStorage.getItem(KEY) || '';
+  $('#apiModel').value = localStorage.getItem(MDL) || 'claude-sonnet-5';
+  $('#dlg').showModal();
+};
+$('#dlgSave').onclick = () => {
+  localStorage.setItem(KEY, $('#apiKey').value.trim());
+  localStorage.setItem(MDL, $('#apiModel').value.trim() || 'claude-sonnet-5');
+  $('#dlg').close();
+};
+$('#dlgForget').onclick = () => { localStorage.removeItem(KEY); $('#apiKey').value=''; $('#dlg').close(); };
+
+async function toBase64(img){
+  const c = document.createElement('canvas');
+  const s = Math.min(1, 900 / Math.max(img.naturalWidth, img.naturalHeight));
+  c.width = Math.round(img.naturalWidth*s); c.height = Math.round(img.naturalHeight*s);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', .85).split(',')[1];
+}
+
+$('#btnAI').onclick = async () => {
+  if (!S.img){ $('#aiHint').textContent = 'Add a photo first.'; return; }
+  const key = localStorage.getItem(KEY);
+  if (!key){ $('#btnSettings').click(); return; }
+  try {
+    busy(true, 'Writing the caption…');
+    const b64 = await toBase64(S.img);
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{ 'content-type':'application/json', 'x-api-key':key,
+        'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+      body: JSON.stringify({
+        model: localStorage.getItem(MDL) || 'claude-sonnet-5',
+        max_tokens: 300,
+        messages:[{ role:'user', content:[
+          { type:'image', source:{ type:'base64', media_type:'image/jpeg', data:b64 } },
+          { type:'text', text:
+`Write gallery-label copy for a poster made from this photo.
+Reply with JSON only, no prose and no code fences:
+{"title":"","subtitle":"","concept":""}
+title: 2-4 words, evocative, like an artwork title.
+subtitle: 5-9 words, one clause, describing the mood or action. No period.
+concept: 2-3 words naming a visual style or movement.` }]}]
+      })
+    });
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const j = await r.json();
+    const txt = j.content.filter(c => c.type === 'text').map(c => c.text).join('').replace(/```json|```/g,'').trim();
+    const o = JSON.parse(txt);
+    $('#tL1').value = `${o.title}\n${o.subtitle}`;
+    $('#tR1').value = `${o.concept}\n${colourLine()}`;
+    $('#aiHint').textContent = 'Caption written. Edit it however you like.';
+    draw();
+  } catch (e){
+    $('#aiHint').textContent = `Caption request failed: ${e.message}. Check the key in Settings.`;
+  } finally { busy(false); }
+};
+
+/* ══ 12. boot ═══════════════════════════════════════════════════════════ */
+S.dominant = ['#6A7F9A','#8B8378','#C3C4C2'];
+S.comp = ['#9A856A','#78848B','#C4C2C3'];
+paintSwatches();
+draw();
+updateSrcHint();
+mpVision().catch(mpFail);
+</script>
+</body>
+</html>
