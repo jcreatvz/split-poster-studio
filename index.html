@@ -244,6 +244,13 @@ Beige-Umber-Charcoal</textarea>
       <output id="splitOut">50%</output>
     </div>
     <div class="slider">
+      <label for="fmtSel">Format</label>
+      <select id="fmtSel" style="flex:1;border:1px solid var(--line);border-radius:var(--r);padding:6px 8px;font-size:12px;background:#fff">
+        <option value="png" selected>PNG — flat image</option>
+        <option value="pdf">PDF — vector shapes and live text</option>
+      </select>
+    </div>
+    <div class="slider" id="rowScale">
       <label for="scaleSel">Export size</label>
       <select id="scaleSel" style="flex:1;border:1px solid var(--line);border-radius:var(--r);padding:6px 8px;font-size:12px;background:#fff">
         <option value="1">1× — base</option>
@@ -251,11 +258,33 @@ Beige-Umber-Charcoal</textarea>
         <option value="3">3× — large</option>
       </select>
     </div>
+    <div class="slider" id="rowPage" hidden>
+      <label for="pageSel">Page size</label>
+      <select id="pageSel" style="flex:1;border:1px solid var(--line);border-radius:var(--r);padding:6px 8px;font-size:12px;background:#fff">
+        <option value="same" selected>Same as preview</option>
+        <option value="in12">12 in tall</option>
+        <option value="in18">18 in tall</option>
+        <option value="in24">24 in tall</option>
+        <option value="in36">36 in tall</option>
+        <option value="a4">A4 — 210 × 297 mm</option>
+        <option value="a3">A3 — 297 × 420 mm</option>
+        <option value="a2">A2 — 420 × 594 mm</option>
+      </select>
+    </div>
+    <div class="slider" id="rowBleed" hidden>
+      <label for="bleedSel">Bleed</label>
+      <select id="bleedSel" style="flex:1;border:1px solid var(--line);border-radius:var(--r);padding:6px 8px;font-size:12px;background:#fff">
+        <option value="0" selected>None</option>
+        <option value="3">3 mm</option>
+        <option value="5">5 mm</option>
+      </select>
+    </div>
     <button class="ghost" id="btnReset" style="margin-top:9px">Reset positions</button>
   </section>
 
   <section style="border-bottom:0">
     <button class="go" id="btnExport" disabled>Export PNG</button>
+    <div class="hint" id="expHint">Halftone dots and pixel blocks become real shapes in PDF. Photos stay photos.</div>
   </section>
 </div>
 
@@ -290,7 +319,41 @@ Beige-Umber-Charcoal</textarea>
 <script type="module">
 /* ══ 1. state ═══════════════════════════════════════════════════════════ */
 const RATIOS = {'3:4':[900,1200], '1:1':[1000,1000], '4:5':[960,1200], '9:16':[810,1440]};
-const FONT = 'system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+const SYS = 'system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
+let FONT = SYS;
+
+/* Inter, instanced to two static weights. The canvas and the PDF read the same
+   file, so measured word widths match and the justified rows land identically. */
+const FONT_SRC = w => ([
+  `./fonts/Inter-${w}.ttf`,
+  `https://cdn.jsdelivr.net/gh/jcreatvz/split-poster-studio@main/fonts/Inter-${w}.ttf`
+]);
+const fontBytes = {};
+
+async function loadFonts(){
+  const grab = async name => {
+    for (const u of FONT_SRC(name)){
+      try {
+        const r = await fetch(u); if (!r.ok) continue;
+        const buf = await r.arrayBuffer();
+        if (buf.byteLength < 4000) continue;
+        return buf;
+      } catch {}
+    }
+    return null;
+  };
+  const [med, semi] = await Promise.all([grab('Medium'), grab('SemiBold')]);
+  if (!med || !semi) return;
+  fontBytes.Medium = med; fontBytes.SemiBold = semi;
+  try {
+    const a = new FontFace('InterPoster', med, {weight:'500'});
+    const b = new FontFace('InterPoster', semi, {weight:'600'});
+    await Promise.all([a.load(), b.load()]);
+    document.fonts.add(a); document.fonts.add(b);
+    FONT = `"InterPoster",${SYS}`;
+    draw();
+  } catch (e){ console.warn('Font load failed, staying on system fonts', e); }
+}
 
 const S = {
   img:null, cutout:null, mask:null, tinted:null, bbox:null, inverted:false,
@@ -606,43 +669,53 @@ function bboxOf(mask){
 /* ══ 5. filters ═════════════════════════════════════════════════════════ */
 const filterCache = { key:'', canvas:null };
 
+/* One sampling pass, consumed by both the canvas renderer and the PDF writer,
+   so a dot on screen is the same dot in the file. */
+function gridCells(dw, dh, unit){
+  const bb = S.bbox;
+  const pitch = Math.max(2, (S.filter === 'dots' ? S.dot : S.px) * unit);
+  const cols = Math.max(1, Math.round(dw / pitch));
+  const rows = Math.max(1, Math.round(dh / pitch));
+  const t = document.createElement('canvas'); t.width = cols; t.height = rows;
+  const tg = t.getContext('2d', {willReadFrequently:true});
+  tg.imageSmoothingQuality = 'high';
+  tg.drawImage(S.cutout, bb.x, bb.y, bb.w, bb.h, 0, 0, cols, rows);
+  return { pitch, cols, rows, data: tg.getImageData(0,0,cols,rows).data, small: t,
+           cw: dw / cols, ch: dh / rows };
+}
+
+function dotRadius(d, i, pitch){
+  const a = d[i+3]/255;
+  const l = lum(d[i], d[i+1], d[i+2]);
+  return (pitch/2) * 1.12 * Math.sqrt(a) * (.62 + .38*(1 - l));
+}
+
 function filteredCutout(dw, dh, unit){
   const key = `${S.filter}|${Math.round(dw)}|${Math.round(dh)}|${S.px}|${S.dot}`;
   if (filterCache.key === key) return filterCache.canvas;
   const bb = S.bbox;
   const out = document.createElement('canvas');
   out.width = Math.max(1, Math.round(dw)); out.height = Math.max(1, Math.round(dh));
-  const g = out.getContext('2d', {willReadFrequently:true});
+  const g = out.getContext('2d');
 
   if (S.filter === 'none'){
     g.imageSmoothingQuality = 'high';
     g.drawImage(S.cutout, bb.x, bb.y, bb.w, bb.h, 0, 0, out.width, out.height);
-  }
-  else if (S.filter === 'pixel'){
-    const p = Math.max(2, S.px * unit);
-    const sw = Math.max(1, Math.round(out.width / p)), sh = Math.max(1, Math.round(out.height / p));
-    const t = document.createElement('canvas'); t.width = sw; t.height = sh;
-    const tg = t.getContext('2d'); tg.imageSmoothingQuality = 'high';
-    tg.drawImage(S.cutout, bb.x, bb.y, bb.w, bb.h, 0, 0, sw, sh);
-    g.imageSmoothingEnabled = false;
-    g.drawImage(t, 0, 0, out.width, out.height);
-  }
-  else {
-    const pitch = Math.max(3, S.dot * unit);
-    const sw = Math.max(1, Math.round(out.width / pitch)), sh = Math.max(1, Math.round(out.height / pitch));
-    const t = document.createElement('canvas'); t.width = sw; t.height = sh;
-    const tg = t.getContext('2d', {willReadFrequently:true}); tg.imageSmoothingQuality = 'high';
-    tg.drawImage(S.cutout, bb.x, bb.y, bb.w, bb.h, 0, 0, sw, sh);
-    const d = tg.getImageData(0,0,sw,sh).data;
-    for (let y=0; y<sh; y++) for (let x=0; x<sw; x++){
-      const i = (y*sw+x)*4, a = d[i+3]/255;
-      if (a < .06) continue;
-      const l = lum(d[i], d[i+1], d[i+2]);
-      const r = (pitch/2) * 1.12 * Math.sqrt(a) * (.62 + .38*(1 - l));
-      g.fillStyle = `rgb(${d[i]},${d[i+1]},${d[i+2]})`;
-      g.beginPath();
-      g.arc((x+.5)*pitch, (y+.5)*pitch, Math.max(.4, r), 0, 6.2832);
-      g.fill();
+  } else {
+    const gr = gridCells(out.width, out.height, unit);
+    if (S.filter === 'pixel'){
+      g.imageSmoothingEnabled = false;
+      g.drawImage(gr.small, 0, 0, out.width, out.height);
+    } else {
+      const d = gr.data;
+      for (let y=0; y<gr.rows; y++) for (let x=0; x<gr.cols; x++){
+        const i = (y*gr.cols+x)*4;
+        if (d[i+3]/255 < .06) continue;
+        g.fillStyle = `rgb(${d[i]},${d[i+1]},${d[i+2]})`;
+        g.beginPath();
+        g.arc((x+.5)*gr.cw, (y+.5)*gr.ch, Math.max(.4, dotRadius(d, i, gr.pitch)), 0, 6.2832);
+        g.fill();
+      }
     }
   }
   filterCache.key = key; filterCache.canvas = out;
@@ -970,22 +1043,296 @@ $('#custom').oninput = e => { S.accent = e.target.value.toUpperCase(); S.tinted 
 ['#tL1','#tR1'].forEach(id => $(id).oninput = draw);
 $('#btnReset').onclick = () => { resetPositions(); draw(); };
 
-/* ══ 10. export ═════════════════════════════════════════════════════════ */
-$('#btnExport').onclick = () => {
+/* ══ 10. tracing the silhouette to a path ═══════════════════════════════ */
+/* Marching squares at the half-alpha isoline, then Douglas–Peucker.
+   Holes come out as their own loops; even-odd fill sorts them. */
+function traceMask(mask, maxEdge = 1000){
+  const s = Math.min(1, maxEdge / Math.max(mask.width, mask.height));
+  const w = Math.max(2, Math.round(mask.width*s)), h = Math.max(2, Math.round(mask.height*s));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d', {willReadFrequently:true});
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(mask, 0, 0, w, h);
+  const px = g.getImageData(0,0,w,h).data;
+  const A = (x,y) => (x<0||y<0||x>=w||y>=h) ? 0 : px[(y*w+x)*4+3] / 255;
+
+  const key = p => `${p[0].toFixed(2)},${p[1].toFixed(2)}`;
+  const segs = new Map();
+  const cut = (x1,y1,v1,x2,y2,v2) => {
+    const t = Math.abs(v2-v1) < 1e-6 ? .5 : (0.5 - v1) / (v2 - v1);
+    return [x1 + (x2-x1)*t, y1 + (y2-y1)*t];
+  };
+
+  for (let y=-1; y<h; y++) for (let x=-1; x<w; x++){
+    const a = A(x,y), b = A(x+1,y), cc = A(x+1,y+1), d = A(x,y+1);
+    const idx = (a>.5?8:0) | (b>.5?4:0) | (cc>.5?2:0) | (d>.5?1:0);
+    if (idx === 0 || idx === 15) continue;
+    const T = () => cut(x,y,a, x+1,y,b),   R = () => cut(x+1,y,b, x+1,y+1,cc);
+    const B = () => cut(x,y+1,d, x+1,y+1,cc), L = () => cut(x,y,a, x,y+1,d);
+    const push = (p,q) => { const k = key(p); (segs.get(k) || segs.set(k,[]).get(k)).push([p,q]); };
+    switch (idx){
+      case 1: case 14: push(L(),B()); break;
+      case 2: case 13: push(B(),R()); break;
+      case 3: case 12: push(L(),R()); break;
+      case 4: case 11: push(R(),T()); break;
+      case 6: case  9: push(B(),T()); break;
+      case 7: case  8: push(T(),L()); break;
+      case 5: push(L(),T()); push(B(),R()); break;
+      case 10: push(T(),R()); push(L(),B()); break;
+    }
+  }
+
+  const loops = [];
+  const used = new Set();
+  for (const [k, list] of segs){
+    for (const seg of list){
+      const id = key(seg[0]) + '>' + key(seg[1]);
+      if (used.has(id)) continue;
+      const loop = [seg[0]];
+      let cur = seg, guard = 0;
+      while (cur && guard++ < 200000){
+        used.add(key(cur[0]) + '>' + key(cur[1]));
+        loop.push(cur[1]);
+        const nexts = segs.get(key(cur[1]));
+        cur = nexts && nexts.find(n => !used.has(key(n[0]) + '>' + key(n[1])));
+      }
+      if (loop.length > 6) loops.push(loop);
+    }
+  }
+  return { loops: loops.map(l => rdp(l, .55)), w, h };
+}
+
+function rdp(pts, eps){
+  if (pts.length < 4) return pts;
+  const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length-1] = 1;
+  const stack = [[0, pts.length-1]];
+  while (stack.length){
+    const [a,b] = stack.pop();
+    let far = -1, fd = eps;
+    const [ax,ay] = pts[a], [bx,by] = pts[b];
+    const dx = bx-ax, dy = by-ay, len = Math.hypot(dx,dy) || 1;
+    for (let i=a+1; i<b; i++){
+      const d = Math.abs((pts[i][0]-ax)*dy - (pts[i][1]-ay)*dx) / len;
+      if (d > fd){ fd = d; far = i; }
+    }
+    if (far > 0){ keep[far] = 1; stack.push([a,far], [far,b]); }
+  }
+  return pts.filter((_,i) => keep[i]);
+}
+
+/* ══ 11. export ═════════════════════════════════════════════════════════ */
+const MM = 2.8346457, IN = 72;
+const PAGES = {
+  same:{}, in12:{tall:12*IN}, in18:{tall:18*IN}, in24:{tall:24*IN}, in36:{tall:36*IN},
+  a4:{w:210*MM, h:297*MM}, a3:{w:297*MM, h:420*MM}, a2:{w:420*MM, h:594*MM}
+};
+
+$('#fmtSel').onchange = e => {
+  const pdf = e.target.value === 'pdf';
+  $('#rowScale').hidden = pdf; $('#rowPage').hidden = !pdf; $('#rowBleed').hidden = !pdf;
+  $('#btnExport').textContent = pdf ? 'Export PDF' : 'Export PNG';
+  $('#expHint').textContent = pdf
+    ? 'Halftone dots and pixel blocks become real shapes. Photos stay photos. RGB, fonts embedded.'
+    : 'A flat image at the size you pick.';
+};
+
+$('#btnExport').onclick = () => $('#fmtSel').value === 'pdf' ? exportPDF() : exportPNG();
+
+function exportPNG(){
   const k = +$('#scaleSel').value, [W,H] = RATIOS[S.ratio];
   const c = document.createElement('canvas'); c.width = W*k; c.height = H*k;
-  const g = c.getContext('2d');
   const cache = filterCache.key; filterCache.key = '';
-  render(g, W*k, H*k);
+  render(c.getContext('2d'), W*k, H*k);
   filterCache.key = cache;
-  c.toBlob(b => {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(b);
-    a.download = `split-poster-${S.ratio.replace(':','x')}-${k}x.png`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  }, 'image/png');
+  c.toBlob(b => save(b, `split-poster-${S.ratio.replace(':','x')}-${k}x.png`), 'image/png');
+}
+
+function save(blob, name){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+let jsPDFReady = null;
+function loadJsPDF(){
+  if (jsPDFReady) return jsPDFReady;
+  jsPDFReady = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = () => res(window.jspdf.jsPDF); s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  return jsPDFReady;
+}
+
+const b64 = buf => {
+  const u = new Uint8Array(buf); let s = '';
+  for (let i=0; i<u.length; i+=8192) s += String.fromCharCode(...u.subarray(i, i+8192));
+  return btoa(s);
 };
+
+async function exportPDF(){
+  try {
+    busy(true, 'Building the PDF…');
+    const jsPDF = await loadJsPDF();
+    const [cw, ch] = RATIOS[S.ratio];
+    const spec = PAGES[$('#pageSel').value] || {};
+    const bleed = +$('#bleedSel').value * MM;
+
+    let pw, ph, posterW, posterH;
+    if (spec.w){ pw = spec.w; ph = spec.h; }
+    else if (spec.tall){ ph = spec.tall; pw = ph * (cw/ch); }
+    else { pw = cw; ph = ch; }
+    const fit = Math.min(pw/cw, ph/ch);
+    posterW = cw*fit; posterH = ch*fit;
+    const ox = bleed + (pw - posterW)/2, oy = bleed + (ph - posterH)/2;
+    const k = fit;                                   // canvas units → points
+
+    const doc = new jsPDF({ unit:'pt', format:[pw + bleed*2, ph + bleed*2],
+                            orientation: pw > ph ? 'landscape' : 'portrait', compress:true });
+
+    let family = 'helvetica';
+    if (fontBytes.Medium && fontBytes.SemiBold){
+      doc.addFileToVFS('Inter-Medium.ttf', b64(fontBytes.Medium));
+      doc.addFont('Inter-Medium.ttf', 'Inter', 'normal');
+      doc.addFileToVFS('Inter-SemiBold.ttf', b64(fontBytes.SemiBold));
+      doc.addFont('Inter-SemiBold.ttf', 'Inter', 'bold');
+      family = 'Inter';
+    }
+
+    const [ar, ag, ab] = hex2rgb(S.accent);
+    doc.setFillColor(ar, ag, ab);
+    doc.rect(0, 0, pw + bleed*2, ph + bleed*2, 'F');
+
+    const splitY = ch * S.split;
+    const bandTop = oy + splitY*k, bandH = (ch - splitY)*k;
+
+    /* bottom band — photo baked to a raster at the band's own size, so the crop
+       is handled in canvas rather than by a PDF clip path */
+    if (S.img){
+      const rasterW = Math.min(4200, Math.round(posterW * 3));
+      const rasterH = Math.round(rasterW * (bandH / posterW));
+      const bc = document.createElement('canvas'); bc.width = rasterW; bc.height = rasterH;
+      const bg = bc.getContext('2d');
+      const sc = rasterW / posterW;
+      const iw = S.img.naturalWidth, ih = S.img.naturalHeight;
+      const base = Math.max(cw/iw, (ch - splitY)/ih) * S.photo.zoom * k * sc;
+      const dw = iw*base, dh = ih*base;
+      bg.drawImage(S.img,
+        (posterW*sc - dw)/2 + S.photo.ox*cw*k*sc,
+        (bandH*sc - dh)/2 + S.photo.oy*cw*k*sc, dw, dh);
+      doc.addImage(bc.toDataURL('image/jpeg', .92), 'JPEG', ox, bandTop, posterW, bandH, undefined, 'FAST');
+    }
+
+    /* silhouette — one even-odd path */
+    if (S.mask){
+      const { loops, w:tw, h:th } = traceMask(S.mask);
+      const iw = S.img.naturalWidth, ih = S.img.naturalHeight;
+      const base = Math.max(cw/iw, (ch - splitY)/ih) * S.photo.zoom;
+      const dw = iw*base, dh = ih*base;
+      const px0 = (cw - dw)/2 + S.photo.ox*cw, py0 = (ch - splitY - dh)/2 + S.photo.oy*cw;
+      const mx = p => ox + (px0 + p[0]/tw * dw) * k;
+      const my = p => bandTop + (py0 + p[1]/th * dh) * k;
+
+      doc.saveGraphicsState();
+      try { doc.rect(ox, bandTop, posterW, bandH); doc.clip(); doc.discardPath(); } catch {}
+      doc.setFillColor(ar, ag, ab);
+      for (const loop of loops){
+        doc.moveTo(mx(loop[0]), my(loop[0]));
+        for (let i=1; i<loop.length; i++) doc.lineTo(mx(loop[i]), my(loop[i]));
+        doc.close();
+      }
+      try { doc.fillEvenOdd(); } catch { doc.fill(); }
+      doc.restoreGraphicsState();
+    }
+
+    /* top band — vector cells, or a raster cutout when the filter is Original */
+    if (S.cutout){
+      const bb = S.bbox;
+      const sh = splitY * S.subj.h, sw = sh * (bb.w / bb.h);
+      const sx = ox + (cw*S.subj.cx - sw/2)*k, sy = oy + (splitY*S.subj.cy - sh/2)*k;
+      const dwPt = sw*k, dhPt = sh*k;
+
+      doc.saveGraphicsState();
+      try { doc.rect(ox, oy, posterW, splitY*k); doc.clip(); doc.discardPath(); } catch {}
+
+      if (S.filter === 'none'){
+        const rc = document.createElement('canvas');
+        rc.width = Math.min(3000, Math.round(dwPt*3)); rc.height = Math.round(rc.width * (dhPt/dwPt));
+        rc.getContext('2d').drawImage(S.cutout, bb.x, bb.y, bb.w, bb.h, 0, 0, rc.width, rc.height);
+        doc.addImage(rc.toDataURL('image/png'), 'PNG', sx, sy, dwPt, dhPt);
+      } else {
+        const gr = gridCells(sw, sh, 1);
+        const d = gr.data, cwPt = dwPt/gr.cols, chPt = dhPt/gr.rows;
+        for (let y=0; y<gr.rows; y++) for (let x=0; x<gr.cols; x++){
+          const i = (y*gr.cols+x)*4, a = d[i+3]/255;
+          if (a < (S.filter === 'pixel' ? .45 : .06)) continue;
+          doc.setFillColor(d[i], d[i+1], d[i+2]);
+          if (S.filter === 'pixel'){
+            doc.rect(sx + x*cwPt, sy + y*chPt, cwPt + .35, chPt + .35, 'F');
+          } else {
+            const r = dotRadius(d, i, gr.pitch) * (cwPt / gr.cw);
+            if (r > .15) doc.circle(sx + (x+.5)*cwPt, sy + (y+.5)*chPt, r, 'F');
+          }
+        }
+      }
+      doc.restoreGraphicsState();
+    }
+
+    /* text — live, embedded, editable */
+    const [l1,l2] = lines('#tL1'), [r1,r2] = lines('#tR1');
+    if (S.layout === 'centered'){
+      const size = cw*.0175*k, pad = cw*.055*k, minW = cw*.17*k;
+      const col = ink(S.accent);
+      const [cr,cg2,cb] = hex2rgb(col);
+      doc.setTextColor(cr, cg2, cb); doc.setFont(family, 'normal'); doc.setFontSize(size);
+      const bb = S.bbox;
+      let sxA = ox + pad, sxB = ox + posterW - pad;
+      if (S.cutout){
+        const sh = splitY*S.subj.h, sw = sh*(bb.w/bb.h);
+        sxA = ox + (cw*S.subj.cx - sw/2)*k; sxB = ox + (cw*S.subj.cx + sw/2)*k;
+      }
+      const cyPt = oy + splitY*k/2, lh = size*1.45;
+      const put = (blk, cxp) => blk.forEach((t,i) =>
+        t && doc.text(t, cxp, cyPt - lh/2 + i*lh, {align:'center', baseline:'middle'}));
+      const lw = (sxA - pad*.5) - (ox + pad), rw = (ox + posterW - pad) - (sxB + pad*.5);
+      if (lw >= minW && rw >= minW){
+        put([l1,l2], (ox + pad + sxA - pad*.5)/2);
+        put([r1,r2], (sxB + pad*.5 + ox + posterW - pad)/2);
+      } else {
+        const a = lw > rw ? ox + pad : sxB + pad*.5;
+        const b = lw > rw ? sxA - pad*.5 : ox + posterW - pad, mid = (a+b)/2;
+        put([l1,l2], (a+mid)/2); put([r1,r2], (mid+b)/2);
+      }
+    } else {
+      const size = cw*.0225*k, pad = cw*.045*k;
+      doc.setFont(family, 'bold'); doc.setFontSize(size);
+      const g = cx;                                   // measure on the canvas, same font
+      const up = withDot(g, l1, r1, cw*.0225), lo = withDot(g, l2, r2, cw*.0225);
+      const rowY = [bandTop - size*.42, bandTop + size*1.14];
+      [up, lo].forEach((words, n) => {
+        const strip = stripLuma(cx, cw, (n ? splitY + size*.3 : splitY - size*1.1), size*1.05);
+        const c = strip > .48 ? 20 : 255;
+        doc.setTextColor(c, c, c);
+        const widths = words.map(t => doc.getTextWidth(t));
+        const total = widths.reduce((a,b) => a+b, 0), usable = posterW - pad*2;
+        if (words.length < 2 || total >= usable){
+          doc.text(words.join(' '), ox + posterW/2, rowY[n], {align:'center'});
+        } else {
+          const gap = (usable - total) / (words.length - 1);
+          let x = ox + pad;
+          words.forEach((t,i) => { doc.text(t, x, rowY[n]); x += widths[i] + gap; });
+        }
+      });
+    }
+
+    const tag = spec.w ? $('#pageSel').value : (spec.tall ? $('#pageSel').value : 'preview');
+    save(doc.output('blob'), `split-poster-${S.ratio.replace(':','x')}-${tag}.pdf`);
+  } catch (e){
+    console.error(e);
+    $('#expHint').textContent = `PDF export failed: ${e.message}`;
+  } finally { busy(false); }
+}
 
 /* ══ 11. caption writer ═════════════════════════════════════════════════ */
 const KEY = 'sps.apiKey', MDL = 'sps.model';
@@ -1054,6 +1401,7 @@ paintSwatches();
 draw();
 updateSrcHint();
 mpVision().catch(mpFail);
+loadFonts();
 </script>
 </body>
 </html>

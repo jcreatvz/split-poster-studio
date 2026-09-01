@@ -12,9 +12,30 @@ No build step, no server, no dependencies to install. Open `index.html` or push 
 
 ```
 index.html                      the whole app
+fonts/Inter-Medium.ttf          poster typeface, 500 weight
+fonts/Inter-SemiBold.ttf        poster typeface, 600 weight
+fonts/OFL.txt                   Inter's licence — keep it with the fonts
 models/magic_touch.tflite       interactive segmenter — click any subject
 models/selfie_segmenter.tflite  person segmenter — no click needed
 ```
+
+## Exporting
+
+**PNG** at 1×, 2× or 3×. A flat image.
+
+**PDF** is mostly vector. Pixel blocks come out as rectangles and halftone dots as
+circles — one shape per cell, sampled from the same pass that draws the preview, so the
+file matches the screen. The silhouette is traced to a real outline with marching squares
+and simplified, so it opens as an editable path in Illustrator. Caption text is live and
+selectable with the font embedded.
+
+Photos stay photos: the bottom half, and the top cutout when the filter is set to Original,
+are embedded as images. A Pixelate or Halftone poster is almost entirely vector; an Original
+one is a photograph with vector type over it.
+
+Page size is chosen at export — the preview's own dimensions, a poster height in inches, or
+A4/A3/A2 with the accent colour filling any leftover margin. Bleed up to 5 mm. The PDF is
+RGB, so your printer converts at their end.
 
 ## Getting the models
 

@@ -1,4 +1,20 @@
-# Third-party notices
+## Inter (fonts/)
+
+Copyright 2020 The Inter Project Authors — <https://github.com/rsms/inter>
+
+Licensed under the SIL Open Font License 1.1; the full text is in `fonts/OFL.txt`, which
+must stay alongside the font files. Inter declares no Reserved Font Name.
+
+**Modified.** The upstream file is a variable font. These were instanced to static weights
+500 and 600 with the optical-size axis pinned at 20, then subset to Latin. Outlines are
+otherwise unaltered.
+
+## jsPDF
+
+Copyright (c) 2010–2021 James Hall and contributors. MIT licence.
+Loaded on demand from cdnjs. Source: <https://github.com/parallax/jsPDF>
+
+## Third-party notices
 
 ## MediaPipe Tasks (Vision)
 
